@@ -1,0 +1,37 @@
+CREATE FUNCTION public.card_stamp()
+    RETURNS trigger
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE NOT LEAKPROOF
+AS $BODY$
+    BEGIN
+        IF NEW.balance > OLd.balance THEN
+            INSERT INTO public."Operation"(
+				operation, card, descr, date)
+				VALUES ('Put', Old.id, (NEW.balance - Old.balance)::text, LOCALTIMESTAMP);
+        END IF;
+		IF NEW.balance < OLd.balance THEN
+			IF NEW.balance < 0 THEN
+				NEW.balance = OLd.balance;
+        		INSERT INTO public."Operation"(
+				operation, card, descr, date)
+				VALUES ('Out', Old.id, 'ERROR:', LOCALTIMESTAMP);
+			ELSE
+            	INSERT INTO public."Operation"(
+					operation, card, descr, date)
+					VALUES ('Out', Old.id, (Old.balance - NEW.balance)::text, LOCALTIMESTAMP);
+			END IF;
+        END IF;
+
+		IF NEW."FIO" <> OLd."FIO" THEN
+            INSERT INTO public."Operation"(
+				operation, card, descr, date)
+				VALUES ('Change FIO', Old.id, Old."FIO", LOCALTIMESTAMP);
+        END IF;
+
+        RETURN NEW;
+    END;
+$BODY$;
+
+ALTER FUNCTION public.card_stamp()
+    OWNER TO postgres;
